@@ -64,14 +64,14 @@ extension SwiftXMLParser: XMLParserDelegate {
         //如果有同名节点，将它们聚合为数组
         if let existingValue = parentDic[elementName] {
             
-            var array: NSMutableArray
+            let array: NSMutableArray
             
             if let currentArray = existingValue as? NSMutableArray {
                 array = currentArray
             } else {
-                //如果没有数组，则创建一个新数组
+                //如果没有数组，则创建一个新数组,将原来的值加进去
                 array = NSMutableArray()
-                array.add(childDic)
+                array.add(existingValue)
                 //将原来的字典替换为数组
                 parentDic[elementName] = array
             }

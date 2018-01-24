@@ -12,6 +12,25 @@ import SwiftXMLParser
 
 class SwiftXMLParserTests: XCTestCase {
     
+    class PayMsg: Codable {
+        var list: [String]
+    }
+    
+    class SysMsg: Codable {
+        var paymsg: PayMsg
+        let type: String
+    }
+    
+    func dicToData(dic:Dictionary<String, Any>) -> Data? {
+        if(!JSONSerialization.isValidJSONObject(dic)) {
+            print("is not a valid json object")
+            return nil
+        }
+        
+        let data = try? JSONSerialization.data(withJSONObject: dic, options: [])
+        return data
+    }
+    
     func testBasic() {
         
         let testxml = """
@@ -32,5 +51,19 @@ class SwiftXMLParserTests: XCTestCase {
         let dic = SwiftXMLParser.dictionaryFormString(string: testxml)
         print(dic as Any)
         XCTAssertNotNil(dic)
+        
+        guard let jsondata = dicToData(dic: dic!["sysmsg"] as! Dictionary<String, Any>) else {
+            XCTFail()
+            return
+        }
+        
+        let sysmsg: SysMsg?
+        do {
+            sysmsg = try JSONDecoder().decode(SysMsg.self, from: jsondata)
+            print(sysmsg!)
+        } catch {
+            print(error)
+            XCTFail()
+        }
     }
 }
