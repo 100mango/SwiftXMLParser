@@ -66,4 +66,28 @@ class SwiftXMLParserTests: XCTestCase {
             XCTFail()
         }
     }
+    
+    func testDicToXML() {
+        
+        let testxml = """
+        <sysmsg type="paymsg">
+            <paymsg>
+                <list>1</list>
+                <list>2</list>
+                <list>3</list>
+                <list>4</list>
+                <list>5</list>
+                <list>6</list>
+                <fromusername><![CDATA[]]></fromusername>
+                <tousername><![CDATA[]]></tousername>
+                <paymsgid><![CDATA[]]></paymsgid>
+            </paymsg>
+        </sysmsg>
+        """
+        let dic = SwiftXMLParser.dictionaryFormString(string: testxml)
+        
+        let xml = SwiftXMLParser.xmlFrom(dic!)
+        print(xml)
+        XCTAssertTrue(xml.count > 0)
+    }
 }

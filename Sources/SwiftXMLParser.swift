@@ -30,6 +30,34 @@ public class SwiftXMLParser: NSObject {
             return nil
         }
     }
+    
+    var xml = ""
+    func xmlFrom(_ root: [String:Any]) -> String {
+        //reset
+        xml = ""
+        for (key,value) in root {
+            dfs(object: value, key: key)
+        }
+        return xml
+    }
+    
+    func dfs(object: Any, key: String) {
+        if let array = object as? [Any] {
+            for item in array {
+                xml.append("<\(key)>")
+                dfs(object: item, key: key)
+                xml.append("</\(key)>")
+            }
+        } else if let dic = object as? [String:Any] {
+            xml.append("<\(key)>")
+            for (key,value) in dic {
+                dfs(object: value, key: key)
+            }
+            xml.append("</\(key)>")
+        } else {
+            xml.append("\(object)")
+        }
+    }
 }
 
 public extension SwiftXMLParser {
@@ -45,6 +73,11 @@ public extension SwiftXMLParser {
         } else {
             return nil
         }
+    }
+    
+    static func xmlFrom(_ root: [String:Any]) -> String {
+        let parser = SwiftXMLParser()
+        return parser.xmlFrom(root)
     }
 }
 
