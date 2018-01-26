@@ -18,7 +18,7 @@ class SwiftXMLParserTests: XCTestCase {
     
     class SysMsg: Codable {
         var paymsg: PayMsg
-        let type: String
+        let _XmlAttributes: [String:String]
     }
     
     func dicToData(dic:Dictionary<String, Any>) -> Data? {
@@ -42,8 +42,8 @@ class SwiftXMLParserTests: XCTestCase {
                 <list>4</list>
                 <list>5</list>
                 <list>6</list>
-                <fromusername><![CDATA[]]></fromusername>
-                <tousername><![CDATA[]]></tousername>
+                <fromusername><![CDATA[mango1]]></fromusername>
+                <tousername><![CDATA[mango2]]></tousername>
                 <paymsgid><![CDATA[]]></paymsgid>
             </paymsg>
         </sysmsg>
@@ -60,7 +60,7 @@ class SwiftXMLParserTests: XCTestCase {
         let sysmsg: SysMsg?
         do {
             sysmsg = try JSONDecoder().decode(SysMsg.self, from: jsondata)
-            print(sysmsg!)
+            dump(sysmsg!)
         } catch {
             print(error)
             XCTFail()
@@ -78,8 +78,8 @@ class SwiftXMLParserTests: XCTestCase {
                 <list>4</list>
                 <list>5</list>
                 <list>6</list>
-                <fromusername><![CDATA[]]></fromusername>
-                <tousername><![CDATA[]]></tousername>
+                <fromusername><![CDATA[mango1]]></fromusername>
+                <tousername><![CDATA[mango2]]></tousername>
                 <paymsgid><![CDATA[]]></paymsgid>
             </paymsg>
         </sysmsg>

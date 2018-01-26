@@ -11,8 +11,11 @@ import Foundation
 public class SwiftXMLParser: NSObject {
     
     public let TextKey = "SwiftXMLParserTextKey"
+    public let AttributesKey = "_XmlAttributes"
+
     var dicStack = [NSMutableDictionary]()
     var textInProcess = ""
+    var attributesAsStandaloneDic = true
     
     func dicWithData(data: Data) -> [String:Any]? {
         
@@ -50,9 +53,37 @@ public class SwiftXMLParser: NSObject {
             }
         } else if let dic = object as? [String:Any] {
             xml.append("<\(key)>")
+            let beginTag = "<\(key)>"
+            let tagKey = key
+            //先检测有无attributes
             for (key,value) in dic {
-                dfs(object: value, key: key)
+                if key == AttributesKey {
+                    if let attributes = value as? [String:String] {
+                        xml.removeLast(beginTag.count)
+                        var attributeString = ""
+                        for (key,value) in attributes {
+                            attributeString.append(" \(key) = \"\(value)\"")
+                        }
+                        xml.append("<\(tagKey)\(attributeString)>")
+                    }
+                }
             }
+            
+            for (key,value) in dic where key != AttributesKey {
+                
+                var isSimpleValue = true
+                if value is [Any] || value is [String:Any] {
+                    isSimpleValue = false
+                }
+                if isSimpleValue {
+                    xml.append("<\(key)>")
+                }
+                dfs(object: value, key: key)
+                if isSimpleValue {
+                    xml.append("</\(key)>")
+                }
+            }
+            
             xml.append("</\(key)>")
         } else {
             xml.append("\(object)")
@@ -90,9 +121,17 @@ extension SwiftXMLParser: XMLParserDelegate {
             fatalError("should not be nil")
         }
         
-        // 生成当前节点,将节点的Attributes作为当前节点的Key&Value
+        // 生成当前节点
         let childDic = NSMutableDictionary()
-        childDic.addEntries(from: attributeDict)
+        if attributesAsStandaloneDic {
+            //将attributes属性作为单独的字典保存，便于后续转回xml
+            if attributeDict.count > 0 {
+                childDic.setObject(attributeDict, forKey: AttributesKey as NSString)
+            }
+        } else {
+            //将节点的Attributes作为当前节点的Key&Value
+            childDic.addEntries(from: attributeDict)
+        }
         
         //如果有同名节点，将它们聚合为数组
         if let existingValue = parentDic[elementName] {
