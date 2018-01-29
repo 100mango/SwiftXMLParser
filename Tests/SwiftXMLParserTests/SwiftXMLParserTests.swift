@@ -18,7 +18,7 @@ class SwiftXMLParserTests: XCTestCase {
     
     class SysMsg: Codable {
         var paymsg: PayMsg
-        let _XmlAttributes: [String:String]
+        let _XMLAttributes: [String:String]
     }
     
     func dicToData(dic:Dictionary<String, Any>) -> Data? {
@@ -48,7 +48,7 @@ class SwiftXMLParserTests: XCTestCase {
             </paymsg>
         </sysmsg>
         """
-        let dic = SwiftXMLParser.dictionaryFormString(string: testxml)
+        let dic = SwiftXMLParser.makeDic(string: testxml)
         print(dic as Any)
         XCTAssertNotNil(dic)
         
@@ -84,9 +84,9 @@ class SwiftXMLParserTests: XCTestCase {
             </paymsg>
         </sysmsg>
         """
-        let dic = SwiftXMLParser.dictionaryFormString(string: testxml)
+        let dic = SwiftXMLParser.makeDic(string: testxml)
         
-        let xml = SwiftXMLParser.xmlFrom(dic!)
+        let xml = SwiftXMLParser.makeXML(dic: dic!)
         print(xml)
         XCTAssertTrue(xml.count > 0)
     }
