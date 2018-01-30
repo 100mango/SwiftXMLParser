@@ -120,7 +120,7 @@ public extension SwiftXMLParser {
             xml.append("</\(key)>")
         } else {
             //simple value
-            xml.append("\(object)")
+            xml.append("<![CDATA[\(object)]]>")
         }
     }
 }
