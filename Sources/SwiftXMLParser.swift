@@ -7,6 +7,9 @@
 //
 
 import Foundation
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
 
 public class SwiftXMLParser: NSObject {
     
@@ -20,9 +23,10 @@ public class SwiftXMLParser: NSObject {
     public var attributesAsStandaloneDic = true
 
 
-    var dicStack = [NSMutableDictionary]()
+    var dicStack = [[String: Any]]()
     var textInProcess = ""
     var xml = ""
+    private var sawRootElement = false
     
 }
 
@@ -54,14 +58,19 @@ public extension SwiftXMLParser {
     func makeDic(data: Data) -> [String:Any]? {
         
         //reset
-        dicStack = [NSMutableDictionary]()
+        dicStack = [[String: Any]]()
         textInProcess = ""
-        dicStack.append(NSMutableDictionary())
+        sawRootElement = false
+        dicStack.append([:])
         
+        guard !data.isEmpty else { return nil }
+
         let parser = XMLParser(data: data)
         parser.delegate = self
-        if parser.parse() == true {
-            return dicStack.first as? [String : Any]
+        // Some FoundationXML versions report parse errors through parserError
+        // even when parse() returns true after recovering the document.
+        if parser.parse(), parser.parserError == nil, sawRootElement, dicStack.count == 1 {
+            return dicStack.first
         } else {
             return nil
         }
@@ -131,48 +140,21 @@ extension SwiftXMLParser: XMLParserDelegate {
     
     public func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
         
-        //get parent
-        guard let parentDic = dicStack.last else {
-            fatalError("should not be nil")
-        }
-        
-        // generate current
-        let childDic = NSMutableDictionary()
+        sawRootElement = true
+        var childDic = [String: Any]()
         if attributesAsStandaloneDic {
-            //transformed attributes as a standalone dictionary
-            //it will help us transform it back to xml
-            if attributeDict.count > 0 {
-                childDic.setObject(attributeDict, forKey: AttributesKey as NSString)
+            if !attributeDict.isEmpty {
+                childDic[AttributesKey] = attributeDict
             }
         } else {
-            //attributes as key,value pair
-            childDic.addEntries(from: attributeDict)
-        }
-        
-        // if element name appears more than once, they need to be grouped as array
-        if let existingValue = parentDic[elementName] {
-            
-            let array: NSMutableArray
-            
-            if let currentArray = existingValue as? NSMutableArray {
-                array = currentArray
-            } else {
-                //If there is no array, create a new array, add the original value
-                array = NSMutableArray()
-                array.add(existingValue)
-                //Replace the original value with an array
-                parentDic[elementName] = array
+            for (key, value) in attributeDict {
+                childDic[key] = value
             }
-            //Add a new element to the array
-            array.add(childDic)
-            
-        } else {
-            //unique element, inserted into parent
-            parentDic[elementName] = childDic
-            dicStack[dicStack.endIndex-1] = parentDic
         }
-        
-        //add to stack, track it
+
+        // Keep unfinished elements on the stack. Inserting them only when complete
+        // avoids relying on NSMutableDictionary/NSMutableArray reference bridging,
+        // which differs between Darwin Foundation and swift-corelibs-foundation.
         dicStack.append(childDic)
     }
     
@@ -181,42 +163,47 @@ extension SwiftXMLParser: XMLParserDelegate {
         textInProcess.append(append)
     }
     
+    public func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        // XMLParser reports CDATA separately from foundCharacters. Preserve its
+        // contents, including whitespace and characters that need XML escaping.
+        if let text = String(data: CDATABlock, encoding: .utf8) {
+            textInProcess.append(text)
+        }
+    }
+
     public func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
         
-        //Get the dic representing the current element
-        guard let value = dicStack.last else {
+        guard var value = dicStack.popLast(), !dicStack.isEmpty else {
             fatalError("should not be nil")
         }
-        let parent = dicStack[dicStack.endIndex - 2]
-        
-        if textInProcess.count > 0 {
-            if value.count > 0 {
-                value[TextKey] = textInProcess
+        defer { textInProcess = "" }
+
+        let completedValue: Any
+        if !textInProcess.isEmpty {
+            if value.isEmpty {
+                completedValue = textInProcess
             } else {
-                //If the current element has only value, no Attributes, like <list> 1 </ list>
-                //Replace the dictionary directly with string
-                if let array = parent[elementName] as? NSMutableArray {
-                    //parent now looks like： {"list" : [1,{}]}
-                    //Replace the empty dictionary with a string
-                    array.removeLastObject()
-                    array.add(textInProcess)
-                } else {
-                    //parent now looks like： {"list" : {} }
-                    //Replace the empty dictionary with a string
-                    parent[elementName] = textInProcess
-                }
+                value[TextKey] = textInProcess
+                completedValue = value
+            }
+        } else if !value.isEmpty {
+            completedValue = value
+        } else {
+            // Empty elements without attributes are omitted, as before.
+            return
+        }
+
+        let parentIndex = dicStack.count - 1
+        if let existingValue = dicStack[parentIndex][elementName] {
+            if var array = existingValue as? [Any] {
+                array.append(completedValue)
+                dicStack[parentIndex][elementName] = array
+            } else {
+                dicStack[parentIndex][elementName] = [existingValue, completedValue]
             }
         } else {
-            //If value is empty and the element has no Attributes, delete the node
-            if value.count == 0 {
-                parent.removeObject(forKey: elementName)
-            }
+            dicStack[parentIndex][elementName] = completedValue
         }
-        
-        //reset
-        textInProcess = ""
-        //Finished processing the current element, pop
-        dicStack.removeLast()
     }
     
     public func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
