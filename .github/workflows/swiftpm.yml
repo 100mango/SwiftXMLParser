@@ -4,6 +4,8 @@ on:
   push:
     branches: [master]
   pull_request:
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -25,7 +27,12 @@ jobs:
           swift --version
           swift package dump-package
           swift package describe
-      - name: Test package
+      - name: Test package in Debug
         run: swift test --jobs 2
-      - name: Build release
-        run: swift build -c release --jobs 2
+      - name: Test package in Release
+        run: swift test -c release --jobs 2
+      - name: Test independent consumer
+        env:
+          PACKAGE_VERSION: ${{ github.event.release.tag_name }}
+          EXPECTED_REVISION: ${{ github.sha }}
+        run: bash scripts/test-consumer.sh

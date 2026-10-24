@@ -26,6 +26,7 @@ public class SwiftXMLParser: NSObject {
     var dicStack = [[String: Any]]()
     var textInProcess = ""
     var xml = ""
+    private var sawRootElement = false
     
 }
 
@@ -59,6 +60,7 @@ public extension SwiftXMLParser {
         //reset
         dicStack = [[String: Any]]()
         textInProcess = ""
+        sawRootElement = false
         dicStack.append([:])
         
         guard !data.isEmpty else { return nil }
@@ -67,7 +69,7 @@ public extension SwiftXMLParser {
         parser.delegate = self
         // Some FoundationXML versions report parse errors through parserError
         // even when parse() returns true after recovering the document.
-        if parser.parse(), parser.parserError == nil, dicStack.count == 1 {
+        if parser.parse(), parser.parserError == nil, sawRootElement, dicStack.count == 1 {
             return dicStack.first
         } else {
             return nil
@@ -138,6 +140,7 @@ extension SwiftXMLParser: XMLParserDelegate {
     
     public func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
         
+        sawRootElement = true
         var childDic = [String: Any]()
         if attributesAsStandaloneDic {
             if !attributeDict.isEmpty {

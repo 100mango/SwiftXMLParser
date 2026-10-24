@@ -185,3 +185,69 @@ extension SwiftXMLParserTests {
         XCTAssertEqual(decoded as NSDictionary?, original as NSDictionary)
     }
 }
+
+
+extension SwiftXMLParserTests {
+    func testRepeatedTextElementsKeepTheirOwnAttributes() {
+        let parser = SwiftXMLParser()
+        let result = parser.makeDic(data: Data("<root><item id=\"1\">one</item><item id=\"2\">two</item></root>".utf8))
+        let items = (result?["root"] as? [String: Any])?["item"] as? [[String: Any]]
+        XCTAssertEqual(items?.count, 2)
+        XCTAssertEqual(items?.first?[parser.AttributesKey] as? [String: String], ["id": "1"])
+        XCTAssertEqual(items?.last?[parser.AttributesKey] as? [String: String], ["id": "2"])
+        XCTAssertEqual(items?.first?[parser.TextKey] as? String, "one")
+        XCTAssertEqual(items?.last?[parser.TextKey] as? String, "two")
+    }
+
+    func testAttributeOnlyElementIsRetained() {
+        let result = SwiftXMLParser.makeDic(string: "<root><item id=\"1\"/></root>")
+        let item = (result?["root"] as? [String: Any])?["item"] as? [String: Any]
+        XCTAssertEqual(item?["_XMLAttributes"] as? [String: String], ["id": "1"])
+    }
+
+    func testSameNamedNestedElementsRemainSeparate() {
+        let result = SwiftXMLParser.makeDic(string: "<root><item><item>inner</item></item></root>")
+        let outer = (result?["root"] as? [String: Any])?["item"] as? [String: Any]
+        XCTAssertEqual(outer?["item"] as? String, "inner")
+    }
+
+    func testEscapedXMLCharactersAreDecoded() {
+        let result = SwiftXMLParser.makeDic(string: "<root>&lt;tag&gt;&amp;&quot;&apos;</root>")
+        XCTAssertEqual(result?["root"] as? String, "<tag>&\"'")
+    }
+
+    func testInvalidXMLVariantsAreRejected() {
+        for input in ["<root>", "<root><child></root>", "<root a='1' a='2'/>", "<a/><b/>", "<root>ok</root>trailing", "plain text", " \n\t"] {
+            XCTAssertNil(SwiftXMLParser.makeDic(string: input), "Accepted invalid XML: \(input)")
+        }
+        XCTAssertNil(SwiftXMLParser.makeDic(data: Data([0xFF, 0xFF, 0x00])))
+    }
+
+    func testParserRecoversAfterFailedParseAndKeepsAttributeMode() {
+        let parser = SwiftXMLParser()
+        parser.attributesAsStandaloneDic = false
+        XCTAssertNil(parser.makeDic(data: Data("<broken><item>old".utf8)))
+        let result = parser.makeDic(data: Data("<root id=\"2\"><item>new</item></root>".utf8))
+        let root = result?["root"] as? [String: Any]
+        XCTAssertEqual(root?["id"] as? String, "2")
+        XCTAssertEqual(root?["item"] as? String, "new")
+        XCTAssertNil(root?[parser.AttributesKey])
+        XCTAssertNil(result?["broken"])
+    }
+
+    func testUTF8DeclarationAndBOM() {
+        let xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root><![CDATA[你好 😀]]></root>"
+        var bytes = Data([0xEF, 0xBB, 0xBF])
+        bytes.append(Data(xml.utf8))
+        XCTAssertEqual(SwiftXMLParser.makeDic(data: bytes)?["root"] as? String, "你好 😀")
+    }
+}
+
+
+extension SwiftXMLParserTests {
+    func testValidEmptyRootIsNotConfusedWithMissingRoot() {
+        let result = SwiftXMLParser.makeDic(string: "<root/>")
+        XCTAssertNotNil(result)
+        XCTAssertTrue(result?.isEmpty == true)
+    }
+}

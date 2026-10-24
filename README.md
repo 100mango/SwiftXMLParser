@@ -10,14 +10,12 @@ project layouts.
 
 Requires Swift 5.3 or later. In Xcode, choose **File > Add Package Dependencies**,
 enter `https://github.com/100mango/SwiftXMLParser.git`, and add the
-`SwiftXMLParser` product to your target. This migration is not yet merged or released. Once the
-`swiftpm-support` branch is published, use that branch or a revision containing
-the updated manifest.
+`SwiftXMLParser` product to your target. Select version `0.2.0` or later.
 
 For a `Package.swift` dependency:
 
 ```swift
-.package(url: "https://github.com/100mango/SwiftXMLParser.git", branch: "swiftpm-support")
+.package(url: "https://github.com/100mango/SwiftXMLParser.git", from: "0.2.0")
 ```
 
 Then add `.product(name: "SwiftXMLParser", package: "SwiftXMLParser")` to your
@@ -34,7 +32,7 @@ The existing `SwiftXMLParser.podspec` and `Sources/` layout are retained. To use
 the repository directly from a Podfile:
 
 ```ruby
-pod 'SwiftXMLParser', :git => 'https://github.com/100mango/SwiftXMLParser.git', :branch => 'swiftpm-support'
+pod 'SwiftXMLParser', :git => 'https://github.com/100mango/SwiftXMLParser.git', :tag => '0.2.0'
 ```
 
 ## Usage
@@ -75,14 +73,16 @@ Run the full package suite on macOS or Linux:
 ```sh
 swift package describe
 swift test
-swift build -c release
+swift test -c release
+bash scripts/test-consumer.sh
 ```
 
-The `SwiftPM` workflow runs the tests and release build on standard Linux and
-macOS runners. It does not sign code or upload build artifacts. Tests cover
+The `SwiftPM` workflow runs Debug and Release tests and an independent
+consuming package on standard Linux and macOS runners. On a GitHub release,
+the consumer resolves the exact published tag and verifies its commit revision. It does not sign code or upload build artifacts. Tests cover
 repeated and nested elements, attribute modes, malformed input, parser reuse,
-serialization, CDATA, and element-only round trips, alongside the original
-tests.
+serialization, CDATA, Unicode/BOM input, invalid document variants, and
+element-only round trips, alongside the original tests.
 
 ## License
 
