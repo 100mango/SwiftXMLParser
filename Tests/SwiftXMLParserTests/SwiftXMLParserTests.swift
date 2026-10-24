@@ -91,3 +91,97 @@ class SwiftXMLParserTests: XCTestCase {
         XCTAssertTrue(xml.count > 0)
     }
 }
+
+
+extension SwiftXMLParserTests {
+    func testRepeatedElementsPreserveOrder() {
+        let result = SwiftXMLParser.makeDic(string: "<root><item>one</item><item>two</item><item>three</item></root>")
+        let root = result?["root"] as? [String: Any]
+        XCTAssertEqual(root?["item"] as? [String], ["one", "two", "three"])
+    }
+
+    func testRepeatedNestedElementsPreserveChildrenAndAttributes() {
+        let result = SwiftXMLParser.makeDic(string: "<root><item id=\"1\"><name>one</name></item><item id=\"2\"><name>two</name></item></root>")
+        let root = result?["root"] as? [String: Any]
+        let items = root?["item"] as? [[String: Any]]
+        XCTAssertEqual(items?.count, 2)
+        XCTAssertEqual(items?.first?["name"] as? String, "one")
+        XCTAssertEqual(items?.last?["name"] as? String, "two")
+        XCTAssertEqual(items?.first?["_XMLAttributes"] as? [String: String], ["id": "1"])
+        XCTAssertEqual(items?.last?["_XMLAttributes"] as? [String: String], ["id": "2"])
+    }
+
+    func testTextAndAttributes() {
+        let parser = SwiftXMLParser()
+        let result = parser.makeDic(data: Data("<item id=\"1\">value</item>".utf8))
+        let item = result?["item"] as? [String: Any]
+        XCTAssertEqual(item?[parser.AttributesKey] as? [String: String], ["id": "1"])
+        XCTAssertEqual(item?[parser.TextKey] as? String, "value")
+    }
+
+    func testFlattenedAttributes() {
+        let parser = SwiftXMLParser()
+        parser.attributesAsStandaloneDic = false
+        let result = parser.makeDic(data: Data("<item id=\"1\">value</item>".utf8))
+        let item = result?["item"] as? [String: Any]
+        XCTAssertEqual(item?["id"] as? String, "1")
+        XCTAssertEqual(item?[parser.TextKey] as? String, "value")
+        XCTAssertNil(item?[parser.AttributesKey])
+    }
+
+    func testParserCanBeReused() {
+        let parser = SwiftXMLParser()
+        XCTAssertEqual(parser.makeDic(data: Data("<first>one</first>".utf8))?["first"] as? String, "one")
+        let second = parser.makeDic(data: Data("<second>two</second>".utf8))
+        XCTAssertNil(second?["first"])
+        XCTAssertEqual(second?["second"] as? String, "two")
+    }
+
+    func testMalformedAndEmptyInput() {
+        XCTAssertNil(SwiftXMLParser.makeDic(string: "<root><item></root>"))
+        XCTAssertNil(SwiftXMLParser.makeDic(data: Data()))
+    }
+
+    func testEmptyElementsDoNotRemoveNonemptySiblings() {
+        let result = SwiftXMLParser.makeDic(string: "<root><item>one</item><item/><empty/></root>")
+        let root = result?["root"] as? [String: Any]
+        XCTAssertEqual(root?["item"] as? String, "one")
+        XCTAssertNil(root?["empty"])
+    }
+
+    func testSerializationUsesCDATAAndResetsState() {
+        let parser = SwiftXMLParser()
+        XCTAssertEqual(parser.makeXML(dic: ["root": ["item": ["one", "two"]]]),
+                       "<root><item><![CDATA[one]]></item><item><![CDATA[two]]></item></root>")
+        XCTAssertEqual(parser.makeXML(dic: ["root": ["item": "three"]]),
+                       "<root><item><![CDATA[three]]></item></root>")
+    }
+}
+
+
+extension SwiftXMLParserTests {
+    func testCDATAContentsArePreserved() {
+        let result = SwiftXMLParser.makeDic(string: "<root><![CDATA[  Hello <world> & 你好 😀  ]]></root>")
+        XCTAssertEqual(result?["root"] as? String, "  Hello <world> & 你好 😀  ")
+    }
+
+    func testAdjacentCDATABlocksAreCombined() {
+        let result = SwiftXMLParser.makeDic(string: "<root><![CDATA[first]]><![CDATA[ second]]></root>")
+        XCTAssertEqual(result?["root"] as? String, "first second")
+    }
+
+    func testSerializedElementOnlyDocumentRoundTrips() {
+        // The dictionary model supports element-only documents, not mixed
+        // text-and-child content. Exercise the serializer's own CDATA output.
+        let original: [String: Any] = [
+            "root": [
+                "_XMLAttributes": ["id": "example"],
+                "item": ["one", "  two & <three>  ", "你好 😀"]
+            ]
+        ]
+        let xml = SwiftXMLParser.makeXML(dic: original)
+        let decoded = SwiftXMLParser.makeDic(string: xml)
+        XCTAssertNotNil(decoded)
+        XCTAssertEqual(decoded as NSDictionary?, original as NSDictionary)
+    }
+}

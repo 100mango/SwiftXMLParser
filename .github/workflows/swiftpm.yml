@@ -1,0 +1,31 @@
+name: SwiftPM
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Inspect package
+        run: |
+          swift --version
+          swift package dump-package
+          swift package describe
+      - name: Test package
+        run: swift test --jobs 2
+      - name: Build release
+        run: swift build -c release --jobs 2
